@@ -4,17 +4,34 @@
 
 # For additional challenge, implement a caching system that will provide the answers to a given array without performing the calculation again. 
 
-
+# Version 1
 # An array factor machine can
 # be initialized with an array
 # get and set a new array
 # calculate the factors of that array
 # return the results as a string
+
+# Version 2
+# An array factor machine can now
+# load a CSV file of cached results
+# sort the source array to ensure output is easy to cache
+# when calculating the factors, first check the loaded CSV for a matching entry. If found, use that entry's result
+# if the result is not found in the cache, perform the factor calculations and store this array and the result in the cache. Then write the cache back to the file
+
 class ArrayFactorMachine
     def initialize(inArray = [])
         @sourceArray = inArray
         @factorString = ""
         @factorHash = {}
+        @cacheFilePath = ""
+    end
+
+    def cacheFilePath
+        @cacheFilePath
+    end
+
+    def setCacheFilePath(inFilePath)
+        @cacheFilePath = inFilePath
     end
 
     def sourceArray
@@ -81,4 +98,6 @@ class ArrayFactorMachine
         end
         return @factorString
     end
+
+
 end
