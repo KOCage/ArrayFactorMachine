@@ -1,4 +1,6 @@
 require './ArrayFactorMachine'
+require 'csv'
+require 'byebug'
 
 RSpec.describe "An ArrayFactorMachine can:" do 
     before do
@@ -24,7 +26,7 @@ RSpec.describe "An ArrayFactorMachine can:" do
         it "get and set a new array" do
             # arrange
             # act
-            @afm.setSourceArray(@testArray)
+            @afm.sourceArray = @testArray
             returnedArray = @afm.sourceArray
             # expect
             expect(returnedArray).to match(@testArray)
@@ -32,7 +34,7 @@ RSpec.describe "An ArrayFactorMachine can:" do
         it "calculate the factors of that array and return the hash" do
             # arrange
             expectedResults = { 2 => [], 4 => [2], 6 => [2], 8 => [2,4], 10 => [2], 20 => [2,4,10] }
-            @afm.setSourceArray(@testArray)
+            @afm.sourceArray = @testArray
             # act
             returnedResults = @afm.calculateFactors
             # expect
@@ -42,9 +44,9 @@ RSpec.describe "An ArrayFactorMachine can:" do
         end
         it "return the results as a string" do
             # arrange
-            expectedString = "2:[];4:[2];6:[2];8:[2,4];10:[2];20:[2,4,10]"
+            expectedString = "2:[];4:[2];6:[2];8:[2, 4];10:[2];20:[2, 4, 10]"
             # act
-            @afm.setSourceArray(@testArray)
+            @afm.sourceArray = @testArray
             resultingHash = @afm.calculateFactors
             resultingString = @afm.factorString
             # expect
@@ -63,40 +65,112 @@ RSpec.describe "An ArrayFactorMachine can:" do
         it "get and set the csv location" do
             # arrange
             # act
-            @afm.setCacheFilePath(@cacheFilePath)
+            @afm.cacheFilePath = @cacheFilePath
             returnedPath = @afm.cacheFilePath
             # assert
             expect(returnedPath).to eq(@cacheFilePath)
         end
         it "load a CSV file of cached results" do
-            skip "is skipped" do
-            end
             # arrange
+            # ensure that the csv file doesn't exist
+            if (File.exists? @cacheFilePath)
+                File.delete @cacheFilePath
+            end
+            # create the cache data
+            cachedData = CSV.open(@cacheFilePath, 'w', write_headers: true, headers: ["sourceArray", "sourceFactors"])
+            expectedFactors = "2:[];4:[2];6:[2];8:[2, 4];10:[2];20:[2, 4, 10]"
+            # write the cache data to the CSV file
+            cachedData << [@testArray, expectedFactors]
+            cachedData.close
+            cachedData = CSV.open(@cacheFilePath, 'r', headers: true)
+            # read the cachedData CSV in to an array of arrays
+            testData = cachedData.read
+            cachedData.close
+            # set the factor machine's csv file path
+            @afm.cacheFilePath = @cacheFilePath
             # act
+            # have the factor machine load the csv file and return it
+            returnedCache = @afm.loadCacheFile
             # assert
+            # for each row of the returned csv, ensure it matches the cachedData csv
+            expect(returnedCache.count).to eq(testData.count)
+            for i in 0...returnedCache.count
+                expect(returnedCache[i]).to eq(testData[i])
+            end
         end
         it "sort the source array in ascending order" do
-            skip "is skipped" do
-            end
             # arrange
+            @afm.sourceArray = [20, 15, 16, 30, 25, 2, 10]
+            expectedArray = [2, 10, 15, 16, 20, 25, 30]
             # act
+            returnedArray = @afm.sourceArray
             # assert
+            for i in 0...expectedArray.length
+                expect(returnedArray[i]).to eq(expectedArray[i])
+            end
         end
-        it "find and use a cached result" do
-            skip "is skipped" do
-            end
+        it "find a cached result" do
             # arrange
+            if (File.exists? @cacheFilePath)
+                File.delete @cacheFilePath
+            end
+            # create the cache data
+            cachedData = CSV.open(@cacheFilePath, 'w', write_headers: true, headers: ["sourceArray", "factors"])
+            expectedFactors = "2:[];4:[2];6:[2];8:[2, 4];10:[2];20:[2, 4, 10]"
+            # write the cache data to the CSV file
+            cachedData << [@testArray, expectedFactors]
+            cachedData.close
+            # have the factor machine load the cache file
+            @afm.cacheFilePath = @cacheFilePath
+            @afm.loadCacheFile
             # act
+            # have the machine search the cache for the test array
+            cachedResult = @afm.getCachedResult(@testArray.to_s)
             # assert
+            # expect returned result tp be equal to the expectedFactors
+            expect(cachedResult).to eq(expectedFactors)
+        end
+        it "initialize a new cache file" do 
+            # arrange
+            # ensure the cache file is deleted
+            if (File.exists? @cacheFilePath)
+                File.delete @cacheFilePath
+            end
+            # set the factor machine's csv path
+            @afm.cacheFilePath = @cacheFilePath
+            # act
+            @afm.initializeCacheCSV
+            fileInitialized = File.exists? @cacheFilePath
+            # assert
+            expect(fileInitialized).to eq(true)
         end
         it "store newly calculated results in the cache file" do
-            skip "is skipped" do
-            end
             # arrange
+            # prepare the expected factor results
+            factors = "2:[];4:[2];6:[2];8:[2, 4];10:[2];20:[2, 4, 10]"
+            # ensure the cache file is empty
+            if (File.exists? @cacheFilePath)
+                File.delete @cacheFilePath
+            end
+            # set the factor machine's csv path
+            @afm.cacheFilePath = @cacheFilePath
+            # set the factor machine's source array to @testArray
+            @afm.sourceArray = @testArray
+            # ensure the cacheFile has been initialized
+            @afm.initializeCacheCSV
             # act
+            # store the results
+            @afm.storeCalculation(@testArray.to_s, factors)
+            # read in the csv cache
+            cacheCSV = CSV.open(@cacheFilePath, 'r', headers: true)
+            # slurp all the data
+            cacheData = cacheCSV.read
+            # close the CSV
+            cacheCSV.close
             # assert
+            # expect the result of the factor calculation to be in the csv
+            expect(cacheData[0][0]).to eq(@testArray.to_s)
+            expect(cacheData[0][1]).to eq(factors)
         end
     end
-
-
 end

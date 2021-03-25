@@ -17,29 +17,31 @@
 # sort the source array to ensure output is easy to cache
 # when calculating the factors, first check the loaded CSV for a matching entry. If found, use that entry's result
 # if the result is not found in the cache, perform the factor calculations and store this array and the result in the cache. Then write the cache back to the file
+require 'csv'
 
 class ArrayFactorMachine
+    attr_accessor :cacheFilePath
+
     def initialize(inArray = [])
         @sourceArray = inArray
+        if (@sourceArray.count > 0)
+            @sourceArray.sort!
+        end
         @factorString = ""
         @factorHash = {}
         @cacheFilePath = ""
-    end
-
-    def cacheFilePath
-        @cacheFilePath
-    end
-
-    def setCacheFilePath(inFilePath)
-        @cacheFilePath = inFilePath
+        @cacheData = Array.new
     end
 
     def sourceArray
         @sourceArray
     end
 
-    def setSourceArray(inArray = [])
+    def sourceArray=(inArray = [])
         @sourceArray = inArray
+        if (@sourceArray.count > 0)
+            @sourceArray.sort!
+        end
         @factorString = ""
     end
 
@@ -78,19 +80,8 @@ class ArrayFactorMachine
         end
         # for each key value pair
         @factorHash.each do |k, v|
-            # start with the key, a colon, and the opening bracket
-            @factorString += "#{k}:["
-            # for each factor in the array
-            v.each do |f|
-                # append the factor and a comma
-                @factorString += "#{f},"
-            end
-            # if there were any factors, then the final character is a comma. remove the last comma
-            if (@factorString[@factorString.length - 1] == ",")
-                @factorString.delete_suffix!(",")
-            end
-            # append the closing bracket and a semicolon
-            @factorString += "];"
+            # write the key, a colon, and then the array of factors, and end with a semicolon
+            @factorString += "#{k}:#{v.to_s};"
         end
         # if the string isn't empty after that, the last character is a semicolon. 
         if (@factorString.length > 0)
@@ -99,5 +90,67 @@ class ArrayFactorMachine
         return @factorString
     end
 
+    def loadCacheFile
+        # if the path is blank, return nil
+        if @cacheFilePath.eql?("")
+            return nil
+        end
+        # load the file in to a CSV object
+        cacheCSV = CSV.open(@cacheFilePath, 'r', headers: true)
+        # slurp all the rows in to the @cacheData array of arrays
+        @cacheData = cacheCSV.read
+        # close the file
+        cacheCSV.close
+        return @cacheData
+    end
 
+    def getCachedResult(arrayString)
+        # if the provided string is nil or blank or the @cacheData is empty, return an empty string
+        if (arrayString.nil? ||
+            arrayString.empty? ||
+            @cacheData.count == 0)
+            return ""
+        end
+        # loop through the @cacheData to find out if any of the source arrays match the array string
+        # because @cacheData is an array of arrays, we want to get the second element of the array
+        @cacheData.each do |s, f|
+            if (arrayString.eql?(s[1]))
+                return f[1]
+            end
+        end
+        return ""
+    end
+
+    def storeCalculation(arrayString, factorString)
+        # if any involved string is nil or empty, return nil
+        if (arrayString.nil? ||
+            arrayString.empty? ||
+            factorString.nil? ||
+            factorString.empty? ||
+            @cacheFilePath.nil? ||
+            @cacheFilePath.empty?)
+            return nil
+        end
+        # open the cache file for write
+        cacheCSV = CSV.open(@cacheFilePath, 'a', headers: true)
+        # add the new array and factors
+        cacheCSV << [arrayString,factorString]
+        cacheCSV.close
+        return true
+    end
+
+    def initializeCacheCSV
+        # if the path is nil or empty, return false
+        if (@cacheFilePath.nil? ||
+            @cacheFilePath.empty?)
+            return false
+        end
+        # if the file exists, return true
+        if (File.exists? @cacheFilePath)
+            return true
+        end
+        # create the file with the appropriate headers
+        cachedCSV = CSV.open(@cacheFilePath, 'w', write_headers: true, headers: ["sourceArray", "factorArray"])
+        cachedCSV.close
+    end
 end
