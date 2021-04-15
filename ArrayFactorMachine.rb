@@ -20,17 +20,17 @@
 require 'csv'
 
 class ArrayFactorMachine
-    attr_accessor :cacheFilePath
+    attr_accessor :cacheFilePath, :cacheData
 
-    def initialize(inArray = [])
+    def initialize(inArray = [], inCachePath = 'E:/Code Ground/Code Challenges/ArrayFactorMachine/cache.csv')
         @sourceArray = inArray
         if (@sourceArray.count > 0)
             @sourceArray.sort!
         end
         @factorString = ""
         @factorHash = {}
-        @cacheFilePath = ""
         @cacheData = Array.new
+        @cacheFilePath = inCachePath
     end
 
     def sourceArray
@@ -50,8 +50,11 @@ class ArrayFactorMachine
     # add each factor to an array
     # add an entry to the hash with the key as the outer number and the value is the array of factors
     def calculateFactors()
+        @factorHash = getCachedResult(@sourceArray)
+        if !@factorHash.nil?
+            return @factorHash
+        end
         @factorHash = {}
-        @factorString = ""
         for i in 0...@sourceArray.length do
             tempArray = []
             for j in 0...@sourceArray.length do
@@ -68,31 +71,32 @@ class ArrayFactorMachine
             # add entry to the hash, i is the key and the array of factors is the value
             @factorHash[@sourceArray[i]] = tempArray
         end
+        storeCalculation(@sourceArray, @factorHash)
         return @factorHash
     end
 
     # want the result like N1:[F1,F2,...F57];N2:[F1,F2,...F13]
-    def factorString
-        # don't return an empty array
-        if (!@factorString.eql?(""))
-            puts "@factorString is not blank"
-            return @factorString
+    def factorHashToString(factorHash)
+        if (factorHash.nil? ||
+            factorHash.count == 0)
+            return ""
         end
+        factorString = ""
         # for each key value pair
-        @factorHash.each do |k, v|
+        factorHash.each do |k, v|
             # write the key, a colon, and then the array of factors, and end with a semicolon
-            @factorString += "#{k}:#{v.to_s};"
+            factorString += "#{k}:#{v.to_s};"
         end
         # if the string isn't empty after that, the last character is a semicolon. 
-        if (@factorString.length > 0)
-            @factorString.delete_suffix!(";")
+        if (factorString.length > 0)
+            factorString.delete_suffix!(";")
         end
-        return @factorString
+        return factorString
     end
 
     def loadCacheFile
         # if the path is blank, return nil
-        if @cacheFilePath.eql?("")
+        if @cacheFilePath.eql?("") || !File.exists?(@cacheFilePath)
             return nil
         end
         # load the file in to a CSV object
@@ -104,29 +108,28 @@ class ArrayFactorMachine
         return @cacheData
     end
 
-    def getCachedResult(arrayString)
+    def getCachedResult(sourceArray)
         # if the provided string is nil or blank or the @cacheData is empty, return an empty string
-        if (arrayString.nil? ||
-            arrayString.empty? ||
-            @cacheData.count == 0)
-            return ""
+        if (sourceArray.nil? ||
+            sourceArray.length == 0 ||
+            @cacheData.length == 0)
+            return nil
         end
         # loop through the @cacheData to find out if any of the source arrays match the array string
-        # because @cacheData is an array of arrays, we want to get the second element of the array
         @cacheData.each do |s, f|
-            if (arrayString.eql?(s[1]))
+            if (sourceArray.to_s.eql?(s[1].to_s))
                 return f[1]
             end
         end
-        return ""
+        return nil
     end
 
-    def storeCalculation(arrayString, factorString)
+    def storeCalculation(arrayString, factorHash)
         # if any involved string is nil or empty, return nil
         if (arrayString.nil? ||
             arrayString.empty? ||
-            factorString.nil? ||
-            factorString.empty? ||
+            factorHash.nil? ||
+            factorHash.empty? ||
             @cacheFilePath.nil? ||
             @cacheFilePath.empty?)
             return nil
@@ -134,8 +137,9 @@ class ArrayFactorMachine
         # open the cache file for write
         cacheCSV = CSV.open(@cacheFilePath, 'a', headers: true)
         # add the new array and factors
-        cacheCSV << [arrayString,factorString]
-        cacheCSV.close
+        cacheCSV << [arrayString, factorHash]
+        cacheCSV.close  
+        @cacheData << [["sourceArray", arrayString], ["factorArray", factorHash]]
         return true
     end
 
@@ -152,5 +156,42 @@ class ArrayFactorMachine
         # create the file with the appropriate headers
         cachedCSV = CSV.open(@cacheFilePath, 'w', write_headers: true, headers: ["sourceArray", "factorArray"])
         cachedCSV.close
+        { success: true }
+    end
+
+    def hashFromString(factorString)
+        @factorHash = {}
+        pairs = factorString.split(';')
+        pairs.each do |p|
+            parts = p.split(':')
+            num = parts[0].to_i
+            factors = parts[1]
+            factors['['] = ""
+            factors[']'] = ""
+            factorStringArray = factors.split(',')
+            factorArray = Array.new
+            factorStringArray.each do |f|
+                factorArray << f.to_i
+            end
+            @factorHash[num] = factorArray
+        end
+        return @factorHash
+    end
+
+    def generateRandomSourceArray(numElements, minValue = 0, maxValue = 100000)
+        @sourceArray = Array.new
+        for i in 0...numElements
+            newNum = Random.rand(minValue..maxValue)
+            safety = 0
+            while @sourceArray.include?(newNum)
+                newNum = Random.rand(minValue..maxValue)
+                safety += 1
+                if (safety > 1000)
+                    break
+                end
+            end
+            @sourceArray << newNum
+        end
+        @sourceArray.sort!
     end
 end

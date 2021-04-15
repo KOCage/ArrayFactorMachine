@@ -1,12 +1,17 @@
 require './ArrayFactorMachine'
 require 'csv'
-require 'byebug'
+require 'benchmark'
 
 RSpec.describe "An ArrayFactorMachine can:" do 
     before do
-        @afm = ArrayFactorMachine.new
-        @testArray = [ 2, 4, 6, 8, 10, 20]
-        @cacheFilePath = "E:/Code Ground/Code Challenges/ArrayFactorMachine/cache.csv"
+        @testArray = [2, 4, 6, 8, 10, 20]
+        @cacheFilePath = "E:/Code Ground/Code Challenges/ArrayFactorMachine/cacheSpec.csv"
+        # ensure that the csv file doesn't exist
+        if (File.exists? @cacheFilePath)
+            File.delete @cacheFilePath
+        end
+        @afm = ArrayFactorMachine.new(@testArray, @cacheFilePath)
+        @afm.initializeCacheCSV
     end
 
     context "Version 1" do
@@ -48,7 +53,7 @@ RSpec.describe "An ArrayFactorMachine can:" do
             # act
             @afm.sourceArray = @testArray
             resultingHash = @afm.calculateFactors
-            resultingString = @afm.factorString
+            resultingString = @afm.factorHashToString(resultingHash)
             # expect
             expect(resultingString).to eq(expectedString)
         end
@@ -62,6 +67,22 @@ RSpec.describe "An ArrayFactorMachine can:" do
     # find and use a cached result
     # store calculated results in the cache file
     context "Version 2" do
+        it "convert a cached string to a hash of factors" do
+            #arrange
+            factorString = "2:[];4:[2];6:[2];8:[2, 4];10:[2];20:[2, 4, 10]"
+            expectedResult = {
+                2 => [],
+                4 => [2],
+                6 => [2],
+                8 => [2, 4],
+                10 => [2],
+                20 => [2, 4, 10]
+            }
+            #act
+            actualResult = @afm.hashFromString(factorString)
+            #assert
+            expect(actualResult).to eq(expectedResult)
+        end
         it "get and set the csv location" do
             # arrange
             # act
@@ -111,12 +132,15 @@ RSpec.describe "An ArrayFactorMachine can:" do
         end
         it "find a cached result" do
             # arrange
-            if (File.exists? @cacheFilePath)
-                File.delete @cacheFilePath
-            end
             # create the cache data
             cachedData = CSV.open(@cacheFilePath, 'w', write_headers: true, headers: ["sourceArray", "factors"])
-            expectedFactors = "2:[];4:[2];6:[2];8:[2, 4];10:[2];20:[2, 4, 10]"
+            expectedFactors = { 2 => [],
+                                4 => [2],
+                                6 => [2],
+                                8 => [2, 4],
+                                10 => [2],
+                                20 => [2, 4, 10] 
+                            }
             # write the cache data to the CSV file
             cachedData << [@testArray, expectedFactors]
             cachedData.close
@@ -125,10 +149,10 @@ RSpec.describe "An ArrayFactorMachine can:" do
             @afm.loadCacheFile
             # act
             # have the machine search the cache for the test array
-            cachedResult = @afm.getCachedResult(@testArray.to_s)
+            cachedResult = @afm.getCachedResult(@testArray)
             # assert
             # expect returned result tp be equal to the expectedFactors
-            expect(cachedResult).to eq(expectedFactors)
+            expect(cachedResult.to_s).to eq(expectedFactors.to_s)
         end
         it "initialize a new cache file" do 
             # arrange
@@ -171,6 +195,28 @@ RSpec.describe "An ArrayFactorMachine can:" do
             # expect the result of the factor calculation to be in the csv
             expect(cacheData[0][0]).to eq(@testArray.to_s)
             expect(cacheData[0][1]).to eq(factors)
+        end
+        context "will save time by using caching" do
+            description = [
+                "the first time",
+                "the second time",
+                "the third time"
+            ]
+            for i in 0...3
+                it "#{description[i]}" do
+                    #arrange
+                    @afm.generateRandomSourceArray(1000, 0, 1500)
+                    #act
+                    notCachedTime = Benchmark.realtime{
+                        r = @afm.calculateFactors
+                    }
+                    cachedTime = Benchmark.realtime{
+                        r = @afm.calculateFactors
+                    }
+                    #assert
+                    expect(notCachedTime).to be > (cachedTime)
+                end
+            end
         end
     end
 end
